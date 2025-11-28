@@ -1,0 +1,7 @@
+{
+  "name": "TRƯỜNG HỌC HẠNH PHÚC",
+  "description": "Hệ thống phòng chống bạo lực học đường và tư vấn tâm lý - THCS Ba Tơ.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
