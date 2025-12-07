@@ -4,8 +4,8 @@ export const ADMIN_PASSWORD = '@123@456@bato';
 
 // Chỉ giữ đúng 2 giáo viên tư vấn để liên hệ
 export const TEACHERS: Teacher[] = [
-  { name: 'Cô Phương (HT)', phone: '0979458347', email: 'tuvan1.trunghoccosobato@gmail.com' },
-  { name: 'Cô Hiên (PHT)', phone: '0982330983', email: 'tuvan2.trunghoccosobato@gmail.com' },
+  { name: 'Giáo Viên Tư Vấn 1', phone: '0979458347', email: 'dothanhvu.trunghoccosobato@gmail.com' },
+  { name: 'Giáo Viên Tư Vấn 2', phone: '0982330983', email: 'dovanlinh.trunghoccosobato@gmail.com' },
 ];
 
 // Danh sách 30 học sinh chính xác từ yêu cầu
