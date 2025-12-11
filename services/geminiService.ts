@@ -3,10 +3,33 @@ import { AiAnalysis } from "../types";
 
 let ai: GoogleGenAI | null = null;
 
-// Hàm lấy client
+// Hàm lấy API Key an toàn, tránh lỗi Build Rollup trên Vercel
+const getApiKey = (): string => {
+  // 1. Ưu tiên lấy từ biến môi trường chuẩn Vite (Vercel hỗ trợ cái này tốt nhất)
+  try {
+    // @ts-ignore
+    if (import.meta && import.meta.env && import.meta.env.VITE_API_KEY) {
+      // @ts-ignore
+      return import.meta.env.VITE_API_KEY;
+    }
+  } catch (e) {}
+
+  // 2. Lấy từ window polyfill (đã định nghĩa trong index.html)
+  // Truy cập qua window giúp Rollup không cố gắng trace biến 'process' toàn cục gây lỗi build
+  try {
+    if (typeof window !== 'undefined' && (window as any).process && (window as any).process.env && (window as any).process.env.API_KEY) {
+      return (window as any).process.env.API_KEY;
+    }
+  } catch (e) {}
+
+  return '';
+};
+
+// Hàm khởi tạo Client
 const getAiClient = () => {
-  if (!ai && process.env.API_KEY) {
-    ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getApiKey();
+  if (!ai && apiKey) {
+    ai = new GoogleGenAI({ apiKey: apiKey });
   }
   return ai;
 };
@@ -19,8 +42,7 @@ Phong cách giao tiếp:
 - Nhiệm vụ: Lắng nghe tâm sự, đưa ra lời khuyên nhẹ nhàng về áp lực học tập, bạn bè, gia đình.
 `;
 
-// --- CẤU HÌNH TRẢ LỜI OFFLINE (KHI MẤT MẠNG) ---
-// Thay vì random, ta dùng từ khóa để chọn câu trả lời phù hợp
+// --- CẤU HÌNH TRẢ LỜI OFFLINE (KHI MẤT MẠNG HOẶC KHÔNG CÓ KEY) ---
 const OFFLINE_KNOWLEDGE_BASE = [
   {
     keywords: ['chào', 'hi', 'hello', 'alo'],
@@ -77,14 +99,11 @@ const getOfflineResponse = (input: string): string => {
   const lowerInput = input.toLowerCase();
   
   for (const topic of OFFLINE_KNOWLEDGE_BASE) {
-    // Nếu tìm thấy bất kỳ từ khóa nào trong nhóm
     if (topic.keywords.some(k => lowerInput.includes(k))) {
-      // Chọn ngẫu nhiên 1 câu trả lời trong nhóm đó
       return topic.answers[Math.floor(Math.random() * topic.answers.length)];
     }
   }
   
-  // Nếu không khớp từ khóa nào, trả về câu mặc định
   return DEFAULT_OFFLINE_ANSWERS[Math.floor(Math.random() * DEFAULT_OFFLINE_ANSWERS.length)];
 };
 
@@ -93,7 +112,7 @@ export const sendMessageToGemini = async (history: { role: 'user' | 'model', par
   // 1. Kiểm tra mạng trình duyệt trước
   if (!navigator.onLine) {
     console.warn("Browser is Offline. Using Rule-based Bot.");
-    await new Promise(resolve => setTimeout(resolve, 800)); // Delay giả lập suy nghĩ
+    await new Promise(resolve => setTimeout(resolve, 800)); 
     return getOfflineResponse(message);
   }
 
@@ -110,24 +129,25 @@ export const sendMessageToGemini = async (history: { role: 'user' | 'model', par
         const result = await chat.sendMessage({ message });
         return result.text;
     } else {
-        // 3. Nếu có mạng nhưng KHÔNG có API Key (Chế độ Demo Online) -> Vẫn dùng Logic Offline trả lời cho thông minh
+        // 3. Nếu có mạng nhưng KHÔNG có API Key -> Vẫn dùng Logic Offline
         console.warn("No API Key provided. Using Rule-based Bot.");
         await new Promise(resolve => setTimeout(resolve, 1000));
         return getOfflineResponse(message);
     }
   } catch (error) {
-    // 4. Lỗi kết nối API -> Fallback về Offline
     console.error("Gemini Connection Error:", error);
     return getOfflineResponse(message);
   }
 };
 
-// Hàm phân tích vụ việc (Giữ nguyên logic fake data khi offline)
+// Hàm phân tích vụ việc
 export const analyzeReportWithGemini = async (content: string): Promise<AiAnalysis | undefined> => {
-    // Nếu offline hoặc không có key, trả về dữ liệu giả định ngẫu nhiên để không bị lỗi App
-    if (!navigator.onLine || !process.env.API_KEY) {
+    const apiKey = getApiKey();
+
+    // Nếu offline hoặc không có key, trả về dữ liệu giả định
+    if (!navigator.onLine || !apiKey) {
         return {
-            severityScore: Math.floor(Math.random() * 40) + 40, // Random 40-80
+            severityScore: Math.floor(Math.random() * 40) + 40,
             potentialRisks: [
                 "Học sinh có thể đang gặp áp lực tâm lý", 
                 "Cần theo dõi thêm biểu hiện trên lớp"
@@ -176,11 +196,10 @@ export const analyzeReportWithGemini = async (content: string): Promise<AiAnalys
 
     } catch (error) {
         console.error("Analysis Error:", error);
-        // Fallback khi lỗi
         return {
             severityScore: 50,
-            potentialRisks: ["tớ không thể trả lời câu hỏi này nó hóc búa quá"],
-            teacherAdvice: ["aizz tớ không thể giúp cậu ở điều kiện thế này"]
+            potentialRisks: ["Không thể phân tích do lỗi kết nối"],
+            teacherAdvice: ["Vui lòng kiểm tra lại báo cáo thủ công"]
         };
     }
 };
