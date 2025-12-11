@@ -40,6 +40,7 @@ export const STUDENTS: Student[] = [
   { name: 'Thuyền', id: '5169641189', class: '9A1' },
   { name: 'Ly', id: '5169641171', class: '9A1' },
   { name: 'Trâm', id: '5169641193', class: '9A1' },
+  { name: 'Mai Trung Hiếu', id: '5179639833', class: '8A4' },
 ];
 
 export const DEFAULT_STUDENT_PASSWORD = '123';
