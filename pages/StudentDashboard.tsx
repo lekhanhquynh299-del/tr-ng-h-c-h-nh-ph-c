@@ -56,7 +56,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user }) => {
   const loadReports = async () => {
     if (user.student) {
       const data = await mockApi.getReports(user.student.id);
-      setReports(data);
+      // Lọc bỏ các hội thoại AI khỏi danh sách Báo cáo/Ý kiến để tránh rác
+      const visibleReports = data.filter(r => !r.isAiConversation);
+      setReports(visibleReports);
     }
   };
 
@@ -230,7 +232,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user }) => {
           </div>
         )}
 
-        {activeTab === 'CHAT_AI' && <div className="h-full pb-4"><Chatbot /></div>}
+        {/* CHAT TAB with Student Info passed down */}
+        {activeTab === 'CHAT_AI' && <div className="h-full pb-4"><Chatbot student={user.student} /></div>}
 
         {activeTab === 'REPORT' && (
           <div className="space-y-4">
@@ -273,9 +276,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user }) => {
                         <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold mr-3">{teacher.name.charAt(0)}</div>
                         <div><div className="font-bold text-gray-800">{teacher.name}</div><div className="text-xs text-gray-500">{teacher.phone}</div></div>
                     </div>
-                    <div className="flex gap-2">
-                        <a href={`tel:${teacher.phone}`} className="flex-1 bg-green-500 text-white py-2 rounded-lg text-xs font-bold text-center shadow-sm">📞 Gọi Ngay</a>
-                        <button onClick={() => handleRequestCallback(teacher.name)} className="flex-1 bg-white border border-blue-200 text-blue-500 py-2 rounded-lg text-xs font-bold">👋 Gọi lại</button>
+                    <div className="grid grid-cols-3 gap-2">
+                        <a href={`tel:${teacher.phone}`} className="bg-green-500 text-white py-2 rounded-lg text-xs font-bold text-center shadow-sm flex items-center justify-center">📞 Gọi</a>
+                        <a href={`mailto:${teacher.email}`} className="bg-red-500 text-white py-2 rounded-lg text-xs font-bold text-center shadow-sm flex items-center justify-center">📧 Email</a>
+                        <button onClick={() => handleRequestCallback(teacher.name)} className="bg-white border border-blue-200 text-blue-500 py-2 rounded-lg text-xs font-bold">👋 Gọi lại</button>
                     </div>
                  </div>
               ))}
