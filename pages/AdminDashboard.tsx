@@ -12,7 +12,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ userSession }) =
   const isAdmin = userSession.role === 'ADMIN';
   const [reports, setReports] = useState<Report[]>([]);
   const [contactRequests, setContactRequests] = useState<ContactRequest[]>([]);
-  // Thêm weeklyData vào state
   const [stats, setStats] = useState({ totalUsers: 0, totalReports: 0, emergencyCount: 0, counselingCount: 0, resolvedCount: 0, robotInteractions: 0, weeklyData: [0,0,0,0,0,0,0] });
   const [replyContent, setReplyContent] = useState<{ [key: string]: string }>({});
   const [activeTab, setActiveTabState] = useState<TabType>(isAdmin ? 'DASHBOARD' : 'EMERGENCY');
@@ -62,7 +61,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ userSession }) =
       const s = await mockApi.getStats();
       const c = await mockApi.getContactRequests();
       setReports(r);
-      // Ép kiểu để TS không báo lỗi vì mockApi.getStats trả về thêm weeklyData
       setStats(s as any);
       setContactRequests(c);
     };
@@ -91,8 +89,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ userSession }) =
     switch (activeTab) {
       case 'EMERGENCY': return reports.filter(r => r.type === ReportType.EMERGENCY);
       case 'REPORTS': return reports.filter(r => r.type === ReportType.BULLYING);
-      case 'OPINIONS': return reports.filter(r => r.type === ReportType.COUNSELING);
-      case 'ROBOT_MODE': return reports.filter(r => r.type === ReportType.COUNSELING); // Robot chỉ trả lời tư vấn
+      case 'OPINIONS': return reports.filter(r => r.type === ReportType.COUNSELING && !r.isAiConversation);
+      // Ở chế độ Robot Mode, hiển thị cả "Thư tâm sự" (Counseling) và "Hội thoại AI"
+      case 'ROBOT_MODE': return reports.filter(r => r.type === ReportType.COUNSELING || r.isAiConversation === true); 
       default: return [];
     }
   };
@@ -100,11 +99,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ userSession }) =
   const filteredReports = getFilteredReports();
   const pendingContacts = contactRequests.filter(c => c.status === 'PENDING');
 
-  // Chart Logic: Sử dụng dữ liệu thực từ mockApi
+  // Chart Logic
   const weeklyData = stats.weeklyData || [0,0,0,0,0,0,0];
-  const maxVal = Math.max(...weeklyData) || 1; // Avoid divide by zero
+  const maxVal = Math.max(...weeklyData) || 1; 
   
-  // Tạo nhãn ngày cho biểu đồ (7 ngày gần nhất)
   const getLast7DaysLabels = () => {
       const days = [];
       for (let i=6; i>=0; i--) {
@@ -160,7 +158,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ userSession }) =
                <p className="text-xs text-gray-500">Dữ liệu thực tế theo ngày</p>
              </div>
              
-             {/* Weekly Bar Chart with Real Data */}
+             {/* Weekly Bar Chart */}
              <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
                 <h3 className="text-sm font-bold text-gray-700 mb-4">Số lượng báo cáo/tương tác (7 ngày qua)</h3>
                 <div className="flex items-end justify-between h-40 space-x-2">
@@ -207,25 +205,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ userSession }) =
 
         {activeTab !== 'DASHBOARD' && activeTab !== 'CONTACTS' && (
           <div className="space-y-4 animate-fadeIn">
-            {activeTab === 'ROBOT_MODE' && <div className="bg-purple-600 text-white p-4 rounded-xl shadow-md mb-4 text-center text-sm">🤖 Bạn đang nhập vai <b>Robot Nhí Nhố</b> để trả lời tâm tư học sinh.</div>}
+            {activeTab === 'ROBOT_MODE' && <div className="bg-purple-600 text-white p-4 rounded-xl shadow-md mb-4 text-center text-sm">🤖 Bạn đang nhập vai <b>Robot Nhí Nhố</b>. Mọi cuộc trò chuyện AI của học sinh đều hiện ở đây để bạn theo dõi và hỗ trợ.</div>}
             
             {filteredReports.length === 0 && <div className="text-center text-gray-400 text-sm py-10">Không có dữ liệu.</div>}
             
             {filteredReports.map(report => (
-               <div key={report.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                  <div className="px-4 py-3 border-b bg-gray-50 flex justify-between items-center">
+               <div key={report.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden ${report.isAiConversation ? 'border-purple-200 ring-1 ring-purple-100' : 'border-gray-100'}`}>
+                  <div className={`px-4 py-3 border-b flex justify-between items-center ${report.isAiConversation ? 'bg-purple-50' : 'bg-gray-50'}`}>
                       <div>
                           <span className="font-bold text-sm text-gray-800">{report.studentName}</span>
                           {report.type === ReportType.EMERGENCY && <span className="ml-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded font-bold">KHẨN CẤP</span>}
+                          {report.isAiConversation && <span className="ml-2 bg-purple-500 text-white text-[10px] px-2 py-0.5 rounded font-bold">LIVE CHAT</span>}
                       </div>
                       <span className="text-[10px] text-gray-400">{new Date(report.timestamp).toLocaleTimeString()}</span>
                   </div>
                   <div className="p-4">
-                     <p className="mb-3 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">{report.content}</p>
-                     <div className="space-y-2 mb-3">
+                     {/* Nếu là AI Chat thì không hiện content gốc (vì nó là tiêu đề dummy), chỉ hiện replies */}
+                     {!report.isAiConversation && (
+                         <p className="mb-3 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">{report.content}</p>
+                     )}
+                     
+                     <div className="space-y-2 mb-3 max-h-60 overflow-y-auto custom-scrollbar">
                          {report.replies.map(rep => (
-                             <div key={rep.id} className={`text-xs p-2 rounded border w-max max-w-[90%] ${rep.author === 'Robot' ? 'bg-purple-50 border-purple-100 ml-auto' : 'bg-blue-50 border-blue-100 ml-auto'}`}>
-                                 <b>{rep.author === 'Robot' ? '🤖 Robot' : 'Giáo viên'}:</b> {rep.content}
+                             <div key={rep.id} className={`flex flex-col text-xs p-2 rounded border w-max max-w-[90%] 
+                                ${rep.author === 'Robot' ? 'bg-purple-50 border-purple-100 text-purple-900 ml-auto' : 
+                                  rep.author === 'Teacher' || rep.author === 'Admin' ? 'bg-blue-50 border-blue-100 text-blue-900 ml-auto' :
+                                  'bg-white border-gray-200 text-gray-800 mr-auto'
+                                }`}>
+                                 <span className="font-bold mb-0.5">{rep.author === 'Robot' ? '🤖 AI' : (rep.author === 'Student' ? 'Học sinh' : 'Giáo viên')}</span>
+                                 <span>{rep.content}</span>
                              </div>
                          ))}
                      </div>
@@ -233,7 +241,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ userSession }) =
                         <input 
                             value={replyContent[report.id] || ''} 
                             onChange={(e) => setReplyContent({...replyContent, [report.id]: e.target.value})} 
-                            placeholder="Nhập phản hồi..." 
+                            placeholder={report.isAiConversation ? "Nhập vai Robot để trả lời..." : "Nhập phản hồi..."} 
                             className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-400" 
                         />
                         <button 
