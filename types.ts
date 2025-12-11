@@ -18,6 +18,12 @@ export enum ReportType {
   COUNSELING = 'COUNSELING',
 }
 
+export interface AiAnalysis {
+  severityScore: number; // 0 - 100
+  potentialRisks: string[];
+  teacherAdvice: string[];
+}
+
 export interface Report {
   id: string;
   studentId: string | null; // null if anonymous
@@ -28,6 +34,7 @@ export interface Report {
   type: ReportType;
   isResolved: boolean;
   isAiConversation?: boolean; // Đánh dấu đây là đoạn chat với AI
+  aiAnalysis?: AiAnalysis; // Phân tích chuyên sâu từ AI
   replies: Reply[];
 }
 
