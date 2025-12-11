@@ -1,17 +1,21 @@
-import { Report, Student, Teacher, ReportType, ContactRequest } from '../types';
+import { Report, Student, Teacher, ReportType, ContactRequest, Reply } from '../types';
 import { STUDENTS, TEACHERS, DEFAULT_STUDENT_PASSWORD, ADMIN_PASSWORD } from '../constants';
 
 // Helper to simulate network delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // LocalStorage Keys
-const REPORTS_KEY = 'safe_school_reports';
-const CONTACTS_KEY = 'safe_school_contacts';
+const REPORTS_KEY = 'safe_school_reports_v2'; // Bump version to clear old struct if needed
+const CONTACTS_KEY = 'safe_school_contacts_v2';
 
 // Get reports from storage
 const getStoredReports = (): Report[] => {
-  const data = localStorage.getItem(REPORTS_KEY);
-  return data ? JSON.parse(data) : [];
+  try {
+    const data = localStorage.getItem(REPORTS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    return [];
+  }
 };
 
 // Save reports to storage
@@ -21,8 +25,12 @@ const saveReports = (reports: Report[]) => {
 
 // Get contacts from storage
 const getStoredContacts = (): ContactRequest[] => {
-  const data = localStorage.getItem(CONTACTS_KEY);
-  return data ? JSON.parse(data) : [];
+  try {
+    const data = localStorage.getItem(CONTACTS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    return [];
+  }
 };
 
 // Save contacts to storage
@@ -45,7 +53,6 @@ export const mockApi = {
     return null;
   },
 
-  // Cập nhật: Thêm check số điện thoại
   verifyTeacher: async (email: string, phone: string, password: string): Promise<Teacher | null> => {
     await delay(300);
     
@@ -71,7 +78,7 @@ export const mockApi = {
 
   getTeachers: async (): Promise<Teacher[]> => {
     await delay(100);
-    return TEACHERS; // Chỉ trả về 2 giáo viên cố định
+    return TEACHERS;
   },
 
   // Report Logic
@@ -106,7 +113,7 @@ export const mockApi = {
   },
 
   getReports: async (studentId?: string): Promise<Report[]> => {
-    await delay(200);
+    // Không delay ở đây để UI cập nhật nhanh hơn
     const reports = getStoredReports();
     if (studentId) {
       return reports.filter(r => r.studentId === studentId);
@@ -115,7 +122,6 @@ export const mockApi = {
   },
 
   resolveReport: async (reportId: string, replyContent: string, authorRole: 'Admin' | 'Teacher' | 'Robot' = 'Teacher'): Promise<Report | null> => {
-    await delay(300);
     const reports = getStoredReports();
     const index = reports.findIndex(r => r.id === reportId);
     if (index !== -1) {
@@ -125,11 +131,93 @@ export const mockApi = {
         content: replyContent,
         timestamp: Date.now()
       });
-      reports[index].isResolved = true;
+      // Nếu là Robot chat, ta không đánh dấu là resolved để hội thoại tiếp tục
+      if (!reports[index].isAiConversation) {
+          reports[index].isResolved = true;
+      }
       saveReports(reports);
       return reports[index];
     }
     return null;
+  },
+
+  // --- AI CHAT SPECIFIC LOGIC ---
+  // Lấy hoặc tạo một phiên chat cho học sinh ngày hôm nay
+  getOrCreateAiSession: async (student: Student): Promise<Report> => {
+    const reports = getStoredReports();
+    const today = new Date().toDateString();
+    
+    // Tìm xem hôm nay học sinh này đã chat chưa
+    let session = reports.find(r => 
+        r.studentId === student.id && 
+        r.isAiConversation === true && 
+        new Date(r.timestamp).toDateString() === today
+    );
+
+    if (!session) {
+        session = {
+            id: 'chat_' + student.id + '_' + Date.now(),
+            studentId: student.id,
+            studentName: student.name,
+            content: "Phiên trò chuyện với Robot Nhí Nhố",
+            type: ReportType.COUNSELING,
+            timestamp: Date.now(),
+            isResolved: false,
+            isAiConversation: true,
+            replies: [
+                {
+                    id: Date.now().toString(),
+                    author: 'Robot',
+                    content: `Chào ${student.name}! Tớ là Nhí Nhố. Hôm nay cậu thế nào? ❤️`,
+                    timestamp: Date.now()
+                }
+            ]
+        };
+        reports.unshift(session); // Đưa lên đầu
+        saveReports(reports);
+    }
+    return session;
+  },
+
+  // Cập nhật tin nhắn mới vào phiên chat (cả User và AI)
+  syncAiChat: async (sessionId: string, userMsg: string, aiMsg: string | null) => {
+      const reports = getStoredReports();
+      const index = reports.findIndex(r => r.id === sessionId);
+      
+      if (index !== -1) {
+          // 1. Thêm tin nhắn của User
+          if (userMsg) {
+             reports[index].replies.push({
+                 id: Date.now().toString() + '_u',
+                 author: 'Student',
+                 content: userMsg,
+                 timestamp: Date.now()
+             });
+          }
+          
+          // 2. Thêm tin nhắn của AI (nếu có)
+          if (aiMsg) {
+              reports[index].replies.push({
+                  id: Date.now().toString() + '_ai',
+                  author: 'Robot',
+                  content: aiMsg,
+                  timestamp: Date.now() + 100 // Đảm bảo timestamp sau user 1 chút
+              });
+          }
+          
+          // Cập nhật timestamp của report để nó nổi lên đầu ở Dashboard giáo viên
+          reports[index].timestamp = Date.now();
+          
+          saveReports(reports);
+          return reports[index];
+      }
+      return null;
+  },
+
+  // Lấy chi tiết 1 report (dùng để poll chat mới từ giáo viên)
+  getReportById: async (id: string): Promise<Report | null> => {
+      const reports = getStoredReports();
+      return reports.find(r => r.id === id) || null;
   },
   
   // Contact Request Logic
@@ -163,7 +251,7 @@ export const mockApi = {
     }
   },
   
-  // Tính toán số liệu thực tế cho Biểu đồ
+  // Tính toán số liệu
   getStats: async () => {
     await delay(100);
     const reports = getStoredReports();
@@ -176,7 +264,7 @@ export const mockApi = {
     // Tính toán số lượng báo cáo trong 7 ngày gần nhất
     const last7Days = [0, 0, 0, 0, 0, 0, 0];
     const today = new Date();
-    today.setHours(0,0,0,0); // Reset về đầu ngày hôm nay
+    today.setHours(0,0,0,0); 
 
     reports.forEach(r => {
         const reportDate = new Date(r.timestamp);
@@ -185,9 +273,7 @@ export const mockApi = {
         const diffTime = Math.abs(today.getTime() - reportDate.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
         
-        // 0 là hôm nay, 1 là hôm qua... đến 6
         if (diffDays < 7) {
-            // Đảo ngược index để khớp với biểu đồ (cũ nhất bên trái, hôm nay bên phải)
             const index = 6 - diffDays; 
             if (index >= 0 && index <= 6) {
                 last7Days[index] += 1;
@@ -195,7 +281,6 @@ export const mockApi = {
         }
     });
     
-    // Đếm số lần Robot tương tác (dựa trên replies có author='Robot')
     let robotInteractions = 0;
     reports.forEach(r => {
         robotInteractions += r.replies.filter(rep => rep.author === 'Robot').length;
@@ -208,7 +293,7 @@ export const mockApi = {
         counselingCount, 
         resolvedCount, 
         robotInteractions,
-        weeklyData: last7Days // Trả về dữ liệu thực tế
+        weeklyData: last7Days 
     };
   }
 };
