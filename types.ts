@@ -22,11 +22,12 @@ export interface Report {
   id: string;
   studentId: string | null; // null if anonymous
   studentName: string; // "Ẩn danh" if anonymous
-  content: string;
+  content: string; // Nội dung khởi tạo hoặc tiêu đề
   location?: string;
   timestamp: number;
   type: ReportType;
   isResolved: boolean;
+  isAiConversation?: boolean; // Đánh dấu đây là đoạn chat với AI
   replies: Reply[];
 }
 
