@@ -3,22 +3,26 @@ import { AiAnalysis } from "../types";
 
 let ai: GoogleGenAI | null = null;
 
-// Hàm lấy API Key an toàn, tránh lỗi Build Rollup trên Vercel
+// Hàm lấy API Key an toàn
+// SỬ DỤNG BRACKET NOTATION window['process'] ĐỂ TRÁNH LỖI BUILD ROLLUP
 const getApiKey = (): string => {
-  // 1. Ưu tiên lấy từ biến môi trường chuẩn Vite (Vercel hỗ trợ cái này tốt nhất)
+  // 1. Ưu tiên lấy từ biến môi trường chuẩn Vite (Vercel hỗ trợ tốt nhất)
   try {
     // @ts-ignore
-    if (import.meta && import.meta.env && import.meta.env.VITE_API_KEY) {
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
       // @ts-ignore
       return import.meta.env.VITE_API_KEY;
     }
   } catch (e) {}
 
-  // 2. Lấy từ window polyfill (đã định nghĩa trong index.html)
-  // Truy cập qua window giúp Rollup không cố gắng trace biến 'process' toàn cục gây lỗi build
+  // 2. Fallback: Lấy từ window polyfill
+  // Quan trọng: Phải dùng ['process'] thay vì .process để Rollup không cố gắng trace biến này
   try {
-    if (typeof window !== 'undefined' && (window as any).process && (window as any).process.env && (window as any).process.env.API_KEY) {
-      return (window as any).process.env.API_KEY;
+    const globalScope = typeof window !== 'undefined' ? window : (typeof self !== 'undefined' ? self : {});
+    // @ts-ignore
+    if (globalScope['process'] && globalScope['process']['env'] && globalScope['process']['env']['API_KEY']) {
+      // @ts-ignore
+      return globalScope['process']['env']['API_KEY'];
     }
   } catch (e) {}
 
@@ -42,7 +46,7 @@ Phong cách giao tiếp:
 - Nhiệm vụ: Lắng nghe tâm sự, đưa ra lời khuyên nhẹ nhàng về áp lực học tập, bạn bè, gia đình.
 `;
 
-// --- CẤU HÌNH TRẢ LỜI OFFLINE (KHI MẤT MẠNG HOẶC KHÔNG CÓ KEY) ---
+// --- CẤU HÌNH TRẢ LỜI OFFLINE (GIỮ NGUYÊN) ---
 const OFFLINE_KNOWLEDGE_BASE = [
   {
     keywords: ['chào', 'hi', 'hello', 'alo'],
