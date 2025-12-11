@@ -12,7 +12,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ userSession }) =
   const isAdmin = userSession.role === 'ADMIN';
   const [reports, setReports] = useState<Report[]>([]);
   const [contactRequests, setContactRequests] = useState<ContactRequest[]>([]);
-  const [stats, setStats] = useState({ totalUsers: 0, totalReports: 0, emergencyCount: 0, counselingCount: 0, resolvedCount: 0, robotInteractions: 0, weeklyData: [0,0,0,0,0,0,0] });
+  const [stats, setStats] = useState({ 
+      totalUsers: 0, 
+      totalReports: 0, 
+      emergencyCount: 0, 
+      counselingCount: 0, 
+      resolvedCount: 0, 
+      robotInteractions: 0, 
+      weeklyData: [0,0,0,0,0,0,0],
+      topClasses: [] as {name: string, count: number}[] 
+  });
   const [replyContent, setReplyContent] = useState<{ [key: string]: string }>({});
   const [activeTab, setActiveTabState] = useState<TabType>(isAdmin ? 'DASHBOARD' : 'EMERGENCY');
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
@@ -172,15 +181,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ userSession }) =
         )}
 
         {activeTab === 'DASHBOARD' && (
-          <div className="animate-fadeIn space-y-6">
+          <div className="animate-fadeIn space-y-4">
              <div className="bg-white p-5 rounded-2xl shadow-sm border border-pink-100 text-center">
-               <h1 className="text-xl font-bold text-pink-600">THỐNG KÊ TUẦN</h1>
-               <p className="text-xs text-gray-500">Dữ liệu thực tế theo ngày</p>
+               <h1 className="text-xl font-bold text-pink-600 uppercase">Trung Tâm Dữ Liệu</h1>
+               <p className="text-xs text-gray-500">Cập nhật thời gian thực</p>
              </div>
              
              {/* Weekly Bar Chart */}
              <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-sm font-bold text-gray-700 mb-4">Biểu đồ báo cáo & tương tác (7 ngày gần nhất)</h3>
+                <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center">
+                    <span className="w-2 h-4 bg-pink-500 rounded mr-2"></span>
+                    Tương tác 7 ngày qua
+                </h3>
                 <div className="flex items-end justify-between h-40 space-x-2">
                     {weeklyData.map((val, idx) => (
                         <div key={idx} className="flex flex-col items-center flex-1">
@@ -195,11 +207,62 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ userSession }) =
                 </div>
              </div>
 
-             <div className="grid grid-cols-2 gap-4">
-                <div className="bg-blue-500 text-white p-4 rounded-2xl shadow-md"><div className="text-3xl font-bold">{stats.totalUsers}</div><div className="text-xs">Thành viên</div></div>
-                <div className="bg-red-500 text-white p-4 rounded-2xl shadow-md"><div className="text-3xl font-bold">{stats.emergencyCount}</div><div className="text-xs">SOS Khẩn cấp</div></div>
-                <div className="bg-purple-600 text-white p-4 rounded-2xl shadow-md"><div className="text-3xl font-bold">{stats.robotInteractions}</div><div className="text-xs">Tương tác AI</div></div>
-                <div className="bg-green-500 text-white p-4 rounded-2xl shadow-md"><div className="text-3xl font-bold">{stats.counselingCount}</div><div className="text-xs">Thư Tư vấn</div></div>
+             {/* Top Classes & Summary Grid */}
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Vùng Cảnh Báo Lớp Học */}
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-orange-100">
+                    <h3 className="text-sm font-bold text-orange-600 mb-3 flex items-center">
+                        ⚠️ Vùng cần quan tâm (Lớp)
+                    </h3>
+                    {stats.topClasses.length > 0 ? (
+                        <div className="space-y-3">
+                            {stats.topClasses.map((item, idx) => (
+                                <div key={idx} className="flex items-center justify-between">
+                                    <div className="flex items-center">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white mr-2 ${idx === 0 ? 'bg-red-500' : (idx === 1 ? 'bg-orange-400' : 'bg-yellow-400')}`}>
+                                            {idx + 1}
+                                        </div>
+                                        <span className="text-sm font-bold text-gray-700">{item.name}</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <div className="h-2 w-24 bg-gray-100 rounded-full mr-2 overflow-hidden">
+                                            <div className="h-full bg-orange-500" style={{width: `${Math.min((item.count/stats.totalReports)*100, 100)}%`}}></div>
+                                        </div>
+                                        <span className="text-xs font-bold text-gray-500">{item.count}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center text-gray-400 text-xs py-4">Chưa có dữ liệu lớp học</div>
+                    )}
+                </div>
+
+                {/* Tổng quan chỉ số */}
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-blue-500 text-white p-3 rounded-2xl shadow-md flex flex-col justify-between">
+                        <div className="text-xs opacity-80">Tổng thành viên</div>
+                        <div className="text-3xl font-bold">{stats.totalUsers}</div>
+                    </div>
+                    <div className="bg-red-500 text-white p-3 rounded-2xl shadow-md flex flex-col justify-between animate-pulse">
+                        <div className="text-xs opacity-80">SOS Khẩn cấp</div>
+                        <div className="text-3xl font-bold">{stats.emergencyCount}</div>
+                    </div>
+                    <div className="bg-purple-600 text-white p-3 rounded-2xl shadow-md flex flex-col justify-between">
+                        <div className="text-xs opacity-80">Chat với AI</div>
+                        <div className="text-3xl font-bold">{stats.robotInteractions}</div>
+                    </div>
+                    <div className="bg-green-500 text-white p-3 rounded-2xl shadow-md flex flex-col justify-between">
+                        <div className="text-xs opacity-80">Đã xử lý</div>
+                        <div className="text-3xl font-bold">{stats.resolvedCount}/{stats.totalReports}</div>
+                    </div>
+                </div>
+             </div>
+             
+             <div className="text-center py-4">
+                 <button className="text-xs text-pink-500 font-bold underline hover:text-pink-600">
+                     Xuất báo cáo chi tiết (.Excel)
+                 </button>
              </div>
           </div>
         )}
